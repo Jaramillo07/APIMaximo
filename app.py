@@ -15,6 +15,9 @@ st.sidebar.header("🔐 Credenciales")
 usuario = st.sidebar.text_input("Usuario:")
 contrasena = st.sidebar.text_input("Contraseña:", type="password")
 
+# Debug mode
+debug_mode = st.sidebar.checkbox("🔍 Modo Debug", help="Muestra información detallada de conexiones")
+
 # Gemini API
 if 'gemini_api_key' in st.secrets:
     gemini_key = st.secrets['gemini_api_key']
@@ -28,7 +31,7 @@ if 'logged_in' not in st.session_state:
 if 'session' not in st.session_state:
     st.session_state.session = None
 
-def login_to_maximo(user, password):
+def login_to_maximo(user, password, debug=False):
     url = "https://rbmanca0.michelin.com/maximo/j_security_check"
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml",
@@ -38,14 +41,35 @@ def login_to_maximo(user, password):
     session = requests.Session()
     
     try:
+        if debug:
+            st.info(f"🔍 Intentando conectar a: {url}")
+        
         response = session.post(url, headers=headers, data=data, verify=False, timeout=10)
+        
+        if debug:
+            st.info(f"📊 Status Code: {response.status_code}")
+            st.info(f"📏 Response Length: {len(response.text)}")
+            
+            # Mostrar parte de la respuesta para debug
+            if len(response.text) > 0:
+                preview = response.text[:200] + "..." if len(response.text) > 200 else response.text
+                st.info(f"📄 Response Preview: {preview}")
+        
         if response.status_code == 200:
-            return session, True
-        return None, False
-    except:
-        return None, False
+            return session, True, "Login exitoso"
+        else:
+            return None, False, f"Status Code: {response.status_code}"
+    
+    except requests.exceptions.Timeout:
+        return None, False, "Timeout - La conexión tardó demasiado"
+    except requests.exceptions.ConnectionError as e:
+        return None, False, f"Error de conexión: {str(e)}"
+    except requests.exceptions.SSLError as e:
+        return None, False, f"Error SSL: {str(e)}"
+    except Exception as e:
+        return None, False, f"Error inesperado: {str(e)}"
 
-def get_orders(session):
+def get_orders(session, debug=False):
     query = ("oslc.where=siteid=\"MX2\" and spi:worktype in [\"I\",\"E\",\"S\"] "
              "and spi:maintenanceshop=\"MX2-NTCH\" and status in [\"PREPARED\",\"WFSCH\"] "
              "and spi:istask=false&oslc.select=wonum,description,status,worktype,spi:location"
@@ -55,12 +79,34 @@ def get_orders(session):
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     
     try:
+        if debug:
+            st.info(f"🔍 Consultando: {url[:80]}...")
+        
         response = session.get(url, headers=headers, verify=False, timeout=15)
+        
+        if debug:
+            st.info(f"📊 Status Code: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
-            return data.get("rdfs:member", [])
+            orders = data.get("rdfs:member", [])
+            if debug:
+                st.info(f"📋 Órdenes encontradas: {len(orders)}")
+            return orders
+        else:
+            st.error(f"❌ Error en API: {response.status_code}")
+            if debug:
+                st.info(f"📄 Response: {response.text[:200]}...")
+            return []
+    
+    except requests.exceptions.Timeout:
+        st.error("❌ Timeout en consulta de órdenes")
         return []
-    except:
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"❌ Error de conexión en consulta: {str(e)}")
+        return []
+    except Exception as e:
+        st.error(f"❌ Error inesperado en consulta: {str(e)}")
         return []
 
 def test_gemini(api_key):
@@ -113,7 +159,7 @@ if not st.session_state.logged_in:
     if st.button("🚀 INICIAR SESIÓN EN MAXIMO", type="primary"):
         if usuario and contrasena:
             with st.spinner("Conectando a Maximo..."):
-                session, login_ok = login_to_maximo(usuario, contrasena)
+                session, login_ok, mensaje = login_to_maximo(usuario, contrasena, debug_mode)
             
             if login_ok:
                 st.session_state.logged_in = True
@@ -121,7 +167,10 @@ if not st.session_state.logged_in:
                 st.success("✅ Login exitoso!")
                 st.rerun()
             else:
-                st.error("❌ Error en login")
+                st.error(f"❌ Error en login: {mensaje}")
+                if debug_mode:
+                    st.markdown("### 🔍 Información de Debug:")
+                    st.info("Revisa los mensajes azules arriba para más detalles del error")
         else:
             st.warning("⚠️ Ingresa usuario y contraseña")
     
@@ -150,7 +199,7 @@ else:
     with col2:
         if st.button("📊 Obtener Órdenes"):
             with st.spinner("Obteniendo órdenes..."):
-                ordenes = get_orders(st.session_state.session)
+                ordenes = get_orders(st.session_state.session, debug_mode)
             
             if ordenes:
                 st.success(f"✅ {len(ordenes)} órdenes obtenidas!")
@@ -200,7 +249,10 @@ else:
 # Info sidebar
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ℹ️ Instrucciones")
-st.sidebar.info("1. Ingresa credenciales\n2. Inicia sesión\n3. Usa los botones del panel")
+st.sidebar.info("1. Ingresa credenciales\n2. Activa Debug si hay problemas\n3. Inicia sesión\n4. Usa los botones del panel")
+
+st.sidebar.markdown("### 🔧 Troubleshooting")
+st.sidebar.warning("Si hay errores de login:\n• Activa modo Debug\n• Verifica credenciales\n• Revisa mensajes detallados")
 
 st.markdown("---")
 st.markdown("🔧 **Smart Maintenance AI** - Prototipo")
