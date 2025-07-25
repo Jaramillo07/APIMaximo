@@ -6,16 +6,23 @@ import urllib3
 # Deshabilitar warnings SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-st.title("🔧 Smart Maintenance AI - Prototipo")
+st.title("🔧 Test Maximo + Gemini API con Streamlit")
 
-# Sidebar para credenciales (más simple)
+# Sidebar para credenciales
 st.sidebar.header("🔐 Credenciales Maximo")
 usuario = st.sidebar.text_input("Usuario:")
 contrasena = st.sidebar.text_input("Contraseña:", type="password")
 
-st.sidebar.header("🤖 API Key Gemini")
-gemini_key = st.sidebar.text_input("Gemini API Key:", type="password")
-st.sidebar.caption("Obtén tu key en: https://makersuite.google.com/app/apikey")
+# 🤖 API Key Gemini - Usar secrets si está disponible
+if 'gemini_api_key' in st.secrets:
+    gemini_key = st.secrets['gemini_api_key']
+    st.sidebar.header("🤖 Gemini AI")
+    st.sidebar.success("✅ API Key configurada")
+    st.sidebar.info("IA lista para análisis automático")
+else:
+    st.sidebar.header("🤖 API Key Gemini")
+    gemini_key = st.sidebar.text_input("Gemini API Key:", type="password")
+    st.sidebar.caption("Obtén tu key en: https://makersuite.google.com/app/apikey")
 
 def test_gemini_api(api_key):
     """Test básico de Gemini API"""
@@ -26,7 +33,7 @@ def test_gemini_api(api_key):
             {
                 "parts": [
                     {
-                        "text": "Responde solo: 'Gemini funcionando en Smart Maintenance AI Prototipo'"
+                        "text": "Responde solo: 'Gemini 1.5 Flash funcionando correctamente en Streamlit'"
                     }
                 ]
             }
@@ -96,9 +103,29 @@ def analyze_wo_with_gemini(api_key, wo_data):
         else:
             return False, f"Error {response.status_code}: {response.text}"
     except Exception as e:
-        return False, f"Error: {e}"
-
 def login_maximo(usuario, contrasena):
+    """Login simple a Maximo"""
+    bmaDev = "https://rbmanca0.michelin.com/"
+    url = f"{bmaDev}maximo/j_security_check"
+    
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Content-type": "application/x-www-form-urlencoded",
+        "Connection": "keep-alive"
+    }
+    data = {"j_username": usuario, "j_password": contrasena}
+    
+    session = requests.Session()
+    
+    try:
+        response = session.post(url, headers=headers, data=data, verify=False, timeout=10)
+        if response.status_code == 200:
+            return session, True
+        else:
+            return None, False
+    except Exception as e:
+        st.error(f"Error de conexión: {e}")
+        return None, False
     """Login simple a Maximo"""
     bmaDev = "https://rbmanca0.michelin.com/"
     url = f"{bmaDev}maximo/j_security_check"
@@ -165,7 +192,7 @@ if gemini_key:
         else:
             st.error(f"❌ Error en Gemini: {gemini_response}")
 else:
-    st.info("💡 Ingresa credenciales en el sidebar para comenzar")
+    st.info("💡 Ingresa tu Gemini API Key en el sidebar para probar la IA")
 
 # Test completo: Maximo + Gemini
 if st.button("🔄 Test Completo: Maximo + IA"):
@@ -241,15 +268,15 @@ if st.button("🔄 Test Completo: Maximo + IA"):
         else:
             st.error("❌ Error en login de Maximo")
     else:
-        st.warning("⚠️ Ingresa credenciales en el sidebar para continuar")
+        st.warning("⚠️ Faltan credenciales (Usuario, Contraseña y API Key de Gemini)")
 
 # Información
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ℹ️ Cómo usar")
-st.sidebar.info("1. Ingresa credenciales arriba\n2. Prueba conexiones\n3. Ve análisis IA")
-st.sidebar.markdown("### 🎯 Objetivo")
-st.sidebar.success("Validar concepto de Smart Maintenance AI")
+st.sidebar.info("1. Ingresa credenciales Maximo\n2. Gemini ya está listo\n3. Ejecuta test completo")
+st.sidebar.markdown("### 🎯 Beneficios")
+st.sidebar.success("• Demo sin fricciones\n• IA pre-configurada\n• Credenciales privadas")
 
 # Footer
 st.markdown("---")
-st.markdown("🔧 **Smart Maintenance AI** - Prototipo de integración Maximo + Gemini")
+st.markdown("🔧 **Smart Maintenance AI** - Test de integración Maximo + Gemini")
